@@ -21,7 +21,16 @@ for _, row in CONNECTIONS.iterrows():
 
 # [NOTE]
 T = int((HORIZON - EPOCH).total_seconds() / 3600)
-SNAPSHOTS = { t: BASE_GRAPH.copy() for t in range(T) }
+
+SNAPSHOTS: dict[int, nx.Graph] = { }
+for t in range(T):
+	G = BASE_GRAPH.copy()
+
+	G.graph['start'] = EPOCH + pd.Timedelta(hours = t)
+	G.graph['end'] = G.graph['start'] + pd.Timedelta(hours = 1)
+
+	SNAPSHOTS[t] = G
+
 
 for _, row in DISRUPTIONS.iterrows():
 	# [NOTE]

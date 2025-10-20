@@ -17,11 +17,13 @@ fig, ax = plt.subplots()
 # [NOTE]
 def plot_snapshot(frame: int) -> None:
 	ax.clear()
-	ax.set_title(str(frame))
 
-	edge_colours = [ 'red' if w else 'black' for _, _, w in SNAPSHOTS[frame].edges.data('weight') ]
+	G = SNAPSHOTS[frame]
 
-	nx.draw(SNAPSHOTS[frame], edge_color = edge_colours, **plot_options)
+	ax.set_title(f'{G.graph['start']} - {G.graph['end']}')
+	edge_colours = [ 'red' if w else 'black' for _, _, w in G.edges.data('weight') ]
+
+	nx.draw(G, edge_color = edge_colours, **plot_options)
 
 _ = FuncAnimation(fig, plot_snapshot, frames = len(SNAPSHOTS.keys()), interval = 250, repeat = True) # type: ignore
 
