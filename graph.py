@@ -1,11 +1,14 @@
+import pandas as pd
 import networkx as nx
 
 from preprocess.connections import CONNECTIONS
+from preprocess.disruptions import DISRUPTIONS
 from preprocess.stations import STATIONS
 
 
 # [NOTE]
-T = 24
+EPOCH = pd.Timestamp('2023-01-01 00:00:00')
+HORIZON = pd.Timestamp('2024-01-01 00:00:00')
 
 
 # [NOTE]
@@ -17,4 +20,12 @@ for _, row in CONNECTIONS.iterrows():
 
 
 # [NOTE]
+T = int((HORIZON - EPOCH).total_seconds() / 3600)
 SNAPSHOTS = { t: BASE_GRAPH.copy() for t in range(T) }
+
+for _, row in DISRUPTIONS.iterrows():
+	# [NOTE]
+	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
+		SNAPSHOTS[t].add_edge(row['from'], row['to'], weight = row['duration'])
+
+	else: break
