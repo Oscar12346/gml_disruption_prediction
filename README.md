@@ -14,5 +14,5 @@ pip install -r requirements.txt
 Draw graph:
 
 ```shell
-python graph.py
+python plot.py
 ```
