@@ -54,7 +54,7 @@ for _, row in df.iterrows():
 df = pd.DataFrame(rows)
 
 # [NOTE] Aggregate disruptions between same stations and within same hour
-df = df.groupby(['start', 'end', 'from', 'to'], as_index = False).agg({ 'duration': 'sum', 'cause': lambda cs: ', '.join(set(cs)) })
+df = df.groupby(['start', 'end', 'from', 'to'], as_index = False).agg({ 'duration': 'sum', 'cause': lambda cs: ', '.join(sorted(set(cs))) })
 
 
 DISRUPTIONS = df
