@@ -7,7 +7,7 @@ from graph import BASE_GRAPH, SNAPSHOTS
 
 # [NOTE]
 plot_options = {
-	'node_size': 50,
+	'node_size': 25,
 	'pos': { node: (data['lng'], data['lat']) for node, data in BASE_GRAPH.nodes(data = True) },
 }
 
@@ -25,7 +25,7 @@ def plot_snapshot(frame: int) -> None:
 
 	nx.draw(G, edge_color = edge_colours, **plot_options)
 
-_ = FuncAnimation(fig, plot_snapshot, frames = len(SNAPSHOTS.keys()), interval = 250, repeat = True) # type: ignore
+_ = FuncAnimation(fig, plot_snapshot, frames = len(SNAPSHOTS.keys()), interval = 25, repeat = True) # type: ignore
 
 # [NOTE]
 plt.tight_layout()
