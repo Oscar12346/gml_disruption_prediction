@@ -1,22 +1,13 @@
 import pandas as pd
 import networkx as nx
 
-from preprocess.connections import CONNECTIONS
+from base_graph import BASE_GRAPH
 from preprocess.disruptions import DISRUPTIONS
-from preprocess.stations import STATIONS
 
 
 # [NOTE]
 EPOCH = pd.Timestamp('2023-01-01 00:00:00')
 HORIZON = pd.Timestamp('2024-01-01 00:00:00')
-
-
-# [NOTE]
-BASE_GRAPH = nx.Graph()
-BASE_GRAPH.add_nodes_from([ (code, row.to_dict()) for code, row in STATIONS.iterrows() ])
-
-for _, row in CONNECTIONS.iterrows():
-	BASE_GRAPH.add_edge(row['from'], row['to'])
 
 
 # [NOTE]
