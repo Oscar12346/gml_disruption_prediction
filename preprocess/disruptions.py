@@ -14,8 +14,8 @@ df = df.drop(columns = ['original_cause'])
 
 # [TODO] Filter out any unrelated causes
 
-# [NOTE] Convert station codes into list of codes and date strings into datetimes
-df['codes'] = df['codes'].str.split(', ')
+# [NOTE] Convert station codes into list of Dutch station codes and date strings into datetimes
+df['codes'] = df['codes'].str.split(', ').apply(lambda cs: [ c for c in cs if c in STATIONS.index ])
 df['start'] = pd.to_datetime(df['start'])
 df['end'] = pd.to_datetime(df['end'])
 
@@ -26,13 +26,13 @@ df['duration'] = (df['end'] - df['start']).dt.total_seconds() / 60
 rows = []
 for _, row in df.iterrows():
 	other = { c: row[c] for c in df.columns if c != 'codes' }
-	rows.extend([ { 'from': row['codes'][i], 'to': row['codes'][i + 1], **other } for i in range(len(row['codes']) - 1) ])
+
+	visited = set()
+	for u in row['codes']:
+		visited.add(u)
+		rows.extend([ { 'from': u, 'to': v, **other } for v in set(STATIONS.loc[u, 'neighbours']).intersection(row['codes']) - visited ]) # type: ignore
 
 df = pd.DataFrame(rows)
-
-# [TODO] Confirm all dropped edges are to stations abroad
-# [NOTE] Filter out any disruptions between train stations not in The Netherlands
-df = df[df['from'].isin(STATIONS.index) & df['to'].isin(STATIONS.index)]
 
 # [NOTE] Segment disruptions from exact timestamps into hours
 rows = []
