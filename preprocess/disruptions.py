@@ -1,5 +1,6 @@
 import pandas as pd
 
+from preprocess.distances import DISTANCES
 from preprocess.stations import STATIONS
 
 df = pd.read_csv('./data/raw/disruptions/2023.csv', usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False)
@@ -22,15 +23,31 @@ df['end'] = pd.to_datetime(df['end'])
 # [NOTE] Compute the exact duration of a disruption
 df['duration'] = (df['end'] - df['start']).dt.total_seconds() / 60
 
+# [TODO] Filter out disruptions on a single station or with incorrect timestamps
+
 # [NOTE] Explode disruptions for a list of station codes into a disruption per station code
 rows = []
 for _, row in df.iterrows():
 	other = { c: row[c] for c in df.columns if c != 'codes' }
-
 	visited = set()
+
+	# [NOTE]
 	for u in row['codes']:
+		if (neighbours := set(STATIONS.loc[u, 'neighbours']).intersection(row['codes'])): # type: ignore
+			visited.add(u)
+			rows.extend([ { 'from': u, 'to': v, **other } for v in neighbours - visited ])
+
+	# [NOTE]
+	for u in set(row['codes']) - visited:
+		target = DISTANCES.loc[u, list(visited) or row['codes']].idxmin()
 		visited.add(u)
-		rows.extend([ { 'from': u, 'to': v, **other } for v in set(STATIONS.loc[u, 'neighbours']).intersection(row['codes']) - visited ]) # type: ignore
+
+		while u != target:
+			closest = DISTANCES.loc[STATIONS.loc[u, 'neighbours'], target].idxmin()
+			visited.add(u)
+
+			rows.append({ 'from': u, 'to': closest, **other })
+			u = closest
 
 df = pd.DataFrame(rows)
 
