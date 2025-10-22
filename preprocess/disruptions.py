@@ -1,9 +1,13 @@
+from glob import glob
 import pandas as pd
 
 from preprocess.distances import DISTANCES
 from preprocess.train_stations import TRAIN_STATIONS
 
-df = pd.read_csv('./data/raw/disruptions/2023.csv', usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False)
+# [NOTE]
+dfs = [ pd.read_csv(f, usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False) for f in glob('./data/raw/disruptions/*.csv') ]
+df = pd.concat(dfs, ignore_index = True)
+
 df = df.rename(columns = { 'rdt_station_codes': 'codes', 'cause_en': 'cause', 'statistical_cause_en': 'original_cause', 'start_time': 'start', 'end_time': 'end' })
 
 # [NOTE] Filter out any values that are NaN

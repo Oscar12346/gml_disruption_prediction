@@ -1,9 +1,12 @@
+from glob import glob
 import pandas as pd
 
 # [NOTE]
 WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
 
-df = pd.read_csv('./data/raw/weather/2023-01.csv', index_col = 'code')
+# [NOTE]
+dfs = [ pd.read_csv(f, index_col = 'code') for f in glob('./data/raw/weather/*.csv') ]
+df = pd.concat(dfs)
 
 # [NOTE]
 INCOMPLETE_WEATHER_STATIONS = df[df[WEATHER_FEATURES].isna().any(axis = 'columns')].index.unique()
