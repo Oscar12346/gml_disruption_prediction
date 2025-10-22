@@ -27,7 +27,7 @@ for t in range(T):
 for _, row in DISRUPTIONS.iterrows():
 	# [NOTE]
 	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
-		SNAPSHOTS[t].add_edge(row['from'], row['to'], weight = row['duration'])
+		SNAPSHOTS[t].edges[row['from'], row['to']].update({ 'type': 'DISRUPTION', 'duration': row['duration'] })
 
 	else: break
 
