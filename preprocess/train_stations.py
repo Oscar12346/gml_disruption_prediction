@@ -25,7 +25,7 @@ def find_closest_weather_station(row) -> str:
 	distances = haversine(row['lat'], row['lng'], WEATHER_STATIONS['lat'], WEATHER_STATIONS['lng'])
 	return WEATHER_STATIONS.index[np.argmin(distances)] # type: ignore
 
-df['weather_station'] = df.apply(find_closest_weather_station, axis = 1)
+df['weather_station'] = df.apply(find_closest_weather_station, axis = 'columns')
 
 
 TRAIN_STATIONS = df
