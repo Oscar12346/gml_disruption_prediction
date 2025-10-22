@@ -75,4 +75,4 @@ df = df.groupby(['start', 'end', 'from', 'to'], as_index = False).agg({ 'duratio
 
 
 DISRUPTIONS = df
-DISRUPTIONS.to_csv('./data/disruptions.csv')
+DISRUPTIONS.to_csv('./data/disruptions.csv', index = False)
