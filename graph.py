@@ -8,7 +8,7 @@ from preprocess.weather import WEATHER, WEATHER_FEATURES
 
 # [NOTE]
 EPOCH = pd.Timestamp('2023-01-01 00:00:00')
-HORIZON = pd.Timestamp('2024-01-01 00:00:00')
+HORIZON = pd.Timestamp('2025-01-01 00:00:00')
 
 
 # [NOTE]
