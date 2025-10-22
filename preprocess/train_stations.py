@@ -2,7 +2,7 @@ import pandas as pd
 
 from preprocess.connections import CONNECTIONS
 
-df = pd.read_csv('./data/raw/stations/2023-09.csv', usecols = ['code', 'name_long', 'country', 'geo_lat', 'geo_lng'], index_col = 'code', na_filter = False)
+df = pd.read_csv('./data/raw/train_stations/2023-09.csv', usecols = ['code', 'name_long', 'country', 'geo_lat', 'geo_lng'], index_col = 'code', na_filter = False)
 df = df.rename(columns = { 'name_long': 'name', 'geo_lat': 'lat', 'geo_lng': 'lng' })
 
 # [NOTE] Filter out any stations not in The Netherlands
@@ -14,5 +14,5 @@ neighbours = pd.concat([ CONNECTIONS, CONNECTIONS.rename(columns = { 'to': 'from
 df['neighbours'] = df.index.map(neighbours.apply(lambda x: sorted(set(x))))
 
 
-STATIONS = df
-STATIONS.to_csv('./data/stations.csv')
+TRAIN_STATIONS = df
+TRAIN_STATIONS.to_csv('./data/train_stations.csv')

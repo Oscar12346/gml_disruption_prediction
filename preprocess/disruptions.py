@@ -1,7 +1,7 @@
 import pandas as pd
 
 from preprocess.distances import DISTANCES
-from preprocess.stations import STATIONS
+from preprocess.train_stations import TRAIN_STATIONS
 
 df = pd.read_csv('./data/raw/disruptions/2023.csv', usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False)
 df = df.rename(columns = { 'rdt_station_codes': 'codes', 'cause_en': 'cause', 'statistical_cause_en': 'original_cause', 'start_time': 'start', 'end_time': 'end' })
@@ -16,7 +16,7 @@ df = df.drop(columns = ['original_cause'])
 # [TODO] Filter out any unrelated causes
 
 # [NOTE] Convert station codes into list of Dutch station codes and date strings into datetimes
-df['codes'] = df['codes'].str.split(', ').apply(lambda cs: [ c for c in cs if c in STATIONS.index ])
+df['codes'] = df['codes'].str.split(', ').apply(lambda cs: [ c for c in cs if c in TRAIN_STATIONS.index ])
 df['start'] = pd.to_datetime(df['start'])
 df['end'] = pd.to_datetime(df['end'])
 
@@ -33,7 +33,7 @@ for _, row in df.iterrows():
 
 	# [NOTE]
 	for u in row['codes']:
-		if (neighbours := set(STATIONS.loc[u, 'neighbours']).intersection(row['codes'])): # type: ignore
+		if (neighbours := set(TRAIN_STATIONS.loc[u, 'neighbours']).intersection(row['codes'])): # type: ignore
 			visited.add(u)
 			rows.extend([ { 'from': u, 'to': v, **other } for v in neighbours - visited ])
 
@@ -43,7 +43,7 @@ for _, row in df.iterrows():
 		visited.add(u)
 
 		while u != target:
-			closest = DISTANCES.loc[STATIONS.loc[u, 'neighbours'], target].idxmin()
+			closest = DISTANCES.loc[TRAIN_STATIONS.loc[u, 'neighbours'], target].idxmin()
 			visited.add(u)
 
 			rows.append({ 'from': u, 'to': closest, **other })
