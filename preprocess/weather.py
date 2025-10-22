@@ -10,7 +10,7 @@ df = pd.concat(dfs)
 
 # [NOTE]
 INCOMPLETE_WEATHER_STATIONS = df[df[WEATHER_FEATURES].isna().any(axis = 'columns')].index.unique()
-df = df.dropna(subset = WEATHER_FEATURES)
+df = df.drop(index = INCOMPLETE_WEATHER_STATIONS)
 
 # [NOTE]
 df['start'] = pd.to_datetime(df['date'].astype(str) + (df['hour'] - 1).astype(str).str.zfill(2), format = '%Y%m%d%H')
