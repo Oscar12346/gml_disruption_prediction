@@ -3,6 +3,7 @@ import networkx as nx
 
 from base_graph import BASE_GRAPH
 from preprocess.disruptions import DISRUPTIONS
+from preprocess.weather import WEATHER, WEATHER_FEATURES
 
 
 # [NOTE]
@@ -27,5 +28,12 @@ for _, row in DISRUPTIONS.iterrows():
 	# [NOTE]
 	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
 		SNAPSHOTS[t].add_edge(row['from'], row['to'], weight = row['duration'])
+
+	else: break
+
+for code, row in WEATHER.iterrows():
+	# [NOTE]
+	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
+		SNAPSHOTS[t].nodes[code].update(row[WEATHER_FEATURES].to_dict())
 
 	else: break

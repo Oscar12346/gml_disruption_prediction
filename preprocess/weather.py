@@ -1,13 +1,13 @@
 import pandas as pd
 
 # [NOTE]
-features = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
+WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
 
 df = pd.read_csv('./data/raw/weather/2023-01.csv', index_col = 'code')
 
 # [NOTE]
-INCOMPLETE_WEATHER_STATIONS = df[df[features].isna().any(axis = 'columns')].index.unique()
-df = df.dropna(subset = features)
+INCOMPLETE_WEATHER_STATIONS = df[df[WEATHER_FEATURES].isna().any(axis = 'columns')].index.unique()
+df = df.dropna(subset = WEATHER_FEATURES)
 
 # [NOTE]
 df['start'] = pd.to_datetime(df['date'].astype(str) + (df['hour'] - 1).astype(str).str.zfill(2), format = '%Y%m%d%H')
