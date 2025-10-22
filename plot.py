@@ -7,6 +7,7 @@ from graph import BASE_GRAPH, SNAPSHOTS
 
 # [NOTE]
 plot_options = {
+	'node_color': [ 'royalblue' if t == 'TRAIN' else 'seagreen' for _, t in BASE_GRAPH.nodes.data('type') ],
 	'node_size': 25,
 	'pos': { node: (data['lng'], data['lat']) for node, data in BASE_GRAPH.nodes(data = True) },
 }
@@ -21,7 +22,7 @@ def plot_snapshot(frame: int) -> None:
 	G = SNAPSHOTS[frame]
 
 	ax.set_title(f'{G.graph['start']} - {G.graph['end']}')
-	edge_colours = [ 'red' if w else 'black' for _, _, w in G.edges.data('weight') ]
+	edge_colours = [ 'red' if t == 'DISRUPTION' else 'darkseagreen' if t == 'WEATHER' else 'grey' for _, _, t in G.edges.data('type') ]
 
 	nx.draw(G, edge_color = edge_colours, **plot_options)
 
