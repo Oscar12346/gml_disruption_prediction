@@ -1,6 +1,8 @@
 from glob import glob
+import numpy as np
 import pandas as pd
 
+from parameters import DISRUPTION_CAUSE_FILTER
 from src.preprocess.distances import DISTANCES
 from src.preprocess.train_stations import TRAIN_STATIONS
 
@@ -13,11 +15,18 @@ df = df.rename(columns = { 'rdt_station_codes': 'codes', 'cause_en': 'cause', 's
 # [NOTE] Filter out any values that are NaN
 df = df.dropna(subset = ['codes', 'start', 'end'])
 
+# [NOTE]
+INACCURATE_CAUSES = ['an earlier disruption', 'cause yet unknown', 'multiple disruptions']
+
 # [NOTE] Merge the causes into a single column, avoiding any duplicates
-df['cause'] = df['cause'].where(df['cause'] == df['original_cause'], df['cause'] + ', ' + df['original_cause'])
+df['cause'] = df['cause'].where(
+	df['cause'] == df['original_cause'],
+	np.where(df['cause'].isin(INACCURATE_CAUSES), df['original_cause'], df['cause'] + ', ' + df['original_cause']),
+)
 df = df.drop(columns = ['original_cause'])
 
-# [TODO] Filter out any unrelated causes
+# [NOTE] Filter out any causes deemed unrelated
+df = df[~df['cause'].isin(DISRUPTION_CAUSE_FILTER)]
 
 # [NOTE] Convert station codes into list of Dutch station codes and date strings into datetimes
 df['codes'] = df['codes'].str.split(', ').apply(lambda cs: sorted([ c for c in cs if c in TRAIN_STATIONS.index ]))
