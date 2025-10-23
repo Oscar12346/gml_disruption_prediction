@@ -7,11 +7,8 @@ from src.preprocess.disruptions import DISRUPTIONS
 from src.preprocess.weather import WEATHER
 
 
-# [NOTE]
-T = int((HORIZON - EPOCH).total_seconds() / 3600)
-
 SNAPSHOTS: dict[int, nx.Graph] = { }
-for t in range(T):
+for t in range(int((HORIZON - EPOCH).total_seconds() / 3600)):
 	G = BASE_GRAPH.copy()
 
 	G.graph['start'] = EPOCH + pd.Timedelta(hours = t)
@@ -19,20 +16,15 @@ for t in range(T):
 
 	SNAPSHOTS[t] = G
 
+# [NOTE]
+for _, row in DISRUPTIONS[(DISRUPTIONS['start'] >= EPOCH) & (DISRUPTIONS['end'] <= HORIZON)].iterrows():
+	t = (row['start'] - EPOCH).total_seconds() / 3600
+	SNAPSHOTS[t].edges[row['from'], row['to']].update({ 'type': 'DISRUPTION', 'duration': row['duration'] })
 
-for _, row in DISRUPTIONS.iterrows():
-	# [NOTE]
-	if (t := (row['start'] - EPOCH).total_seconds() / 3600) >= 0 and t < T:
-		SNAPSHOTS[t].edges[row['from'], row['to']].update({ 'type': 'DISRUPTION', 'duration': row['duration'] })
-
-	else: break
-
-for code, row in WEATHER.iterrows():
-	# [NOTE]
-	if (t := (row['start'] - EPOCH).total_seconds() / 3600) >= 0 and t < T:
-		SNAPSHOTS[t].nodes[code].update(row[WEATHER_FEATURES].to_dict())
-
-	else: break
+# [NOTE]
+for code, row in WEATHER[(WEATHER['start'] >= EPOCH) & (WEATHER['end'] <= HORIZON)].iterrows():
+	t = (row['start'] - EPOCH).total_seconds() / 3600
+	SNAPSHOTS[t].nodes[code].update(row[WEATHER_FEATURES].to_dict())
 
 
 # [NOTE]

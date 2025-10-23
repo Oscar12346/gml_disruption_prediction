@@ -3,7 +3,6 @@ import pandas as pd
 
 from parameters import WEATHER_FEATURES
 
-
 # [NOTE]
 dfs = [ pd.read_csv(f, index_col = 'code') for f in glob('./data/raw/weather/*.csv') ]
 df = pd.concat(dfs)
