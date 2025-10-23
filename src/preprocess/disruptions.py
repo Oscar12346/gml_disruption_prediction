@@ -36,7 +36,10 @@ df['end'] = pd.to_datetime(df['end'])
 # [NOTE] Compute the exact duration of a disruption
 df['duration'] = (df['end'] - df['start']).dt.total_seconds() / 60
 
-# [TODO] Filter out disruptions on a single station or with incorrect timestamps
+# [NOTE] Filter out disruptions on a single station, duration less than a minute or with incorrect timestamps
+df = df[df['codes'].apply(len) > 1]
+df = df[df['duration'] > 1.0]
+df = df[df['start'] < df['end']]
 
 # [NOTE] Explode disruptions for a list of station codes into a disruption per station code
 rows = []
