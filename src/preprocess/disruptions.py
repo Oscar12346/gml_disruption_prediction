@@ -1,8 +1,8 @@
 from glob import glob
 import pandas as pd
 
-from preprocess.distances import DISTANCES
-from preprocess.train_stations import TRAIN_STATIONS
+from src.preprocess.distances import DISTANCES
+from src.preprocess.train_stations import TRAIN_STATIONS
 
 # [NOTE]
 dfs = [ pd.read_csv(f, usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False) for f in glob('./data/raw/disruptions/*.csv') ]

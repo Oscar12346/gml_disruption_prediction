@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from preprocess.connections import CONNECTIONS
-from preprocess.weather_stations import WEATHER_STATIONS
+from src.preprocess.connections import CONNECTIONS
+from src.preprocess.weather_stations import WEATHER_STATIONS
 
 df = pd.read_csv('./data/raw/train_stations/2023-09.csv', usecols = ['code', 'name_long', 'country', 'geo_lat', 'geo_lng'], index_col = 'code', na_filter = False)
 df = df.rename(columns = { 'name_long': 'name', 'geo_lat': 'lat', 'geo_lng': 'lng' })

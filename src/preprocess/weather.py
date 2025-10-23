@@ -1,8 +1,8 @@
 from glob import glob
 import pandas as pd
 
-# [NOTE]
-WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
+from parameters import WEATHER_FEATURES
+
 
 # [NOTE]
 dfs = [ pd.read_csv(f, index_col = 'code') for f in glob('./data/raw/weather/*.csv') ]

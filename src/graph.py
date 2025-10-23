@@ -1,14 +1,10 @@
 import pandas as pd
 import networkx as nx
 
-from base_graph import BASE_GRAPH
-from preprocess.disruptions import DISRUPTIONS
-from preprocess.weather import WEATHER, WEATHER_FEATURES
-
-
-# [NOTE]
-EPOCH = pd.Timestamp('2023-01-01 00:00:00')
-HORIZON = pd.Timestamp('2025-01-01 00:00:00')
+from src.base_graph import BASE_GRAPH
+from parameters import EPOCH, HORIZON, WEATHER_FEATURES
+from src.preprocess.disruptions import DISRUPTIONS
+from src.preprocess.weather import WEATHER
 
 
 # [NOTE]
@@ -26,14 +22,14 @@ for t in range(T):
 
 for _, row in DISRUPTIONS.iterrows():
 	# [NOTE]
-	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
+	if (t := (row['start'] - EPOCH).total_seconds() / 3600) >= 0 and t < T:
 		SNAPSHOTS[t].edges[row['from'], row['to']].update({ 'type': 'DISRUPTION', 'duration': row['duration'] })
 
 	else: break
 
 for code, row in WEATHER.iterrows():
 	# [NOTE]
-	if (t := (row['start'] - EPOCH).total_seconds() / 3600) < T:
+	if (t := (row['start'] - EPOCH).total_seconds() / 3600) >= 0 and t < T:
 		SNAPSHOTS[t].nodes[code].update(row[WEATHER_FEATURES].to_dict())
 
 	else: break

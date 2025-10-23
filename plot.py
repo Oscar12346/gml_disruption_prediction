@@ -2,7 +2,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import networkx as nx
 
-from graph import BASE_GRAPH, SNAPSHOTS
+from src.graph import BASE_GRAPH, SNAPSHOTS
 
 
 # [NOTE]

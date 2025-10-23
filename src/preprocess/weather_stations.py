@@ -1,6 +1,6 @@
 import pandas as pd
 
-from preprocess.weather import INCOMPLETE_WEATHER_STATIONS
+from src.preprocess.weather import INCOMPLETE_WEATHER_STATIONS
 
 df = pd.read_csv('./data/raw/weather_stations/2023.csv', usecols = ['STN', 'LON', 'LAT', 'NAME'], index_col = 'STN')
 

@@ -1,8 +1,8 @@
 import networkx as nx
 
-from preprocess.connections import CONNECTIONS
-from preprocess.train_stations import TRAIN_STATIONS
-from preprocess.weather_stations import WEATHER_STATIONS
+from src.preprocess.connections import CONNECTIONS
+from src.preprocess.train_stations import TRAIN_STATIONS
+from src.preprocess.weather_stations import WEATHER_STATIONS
 
 # [NOTE]
 BASE_GRAPH = nx.Graph()
