@@ -6,7 +6,7 @@ from parameters import DISRUPTION_CAUSE_FILTER
 from src.preprocess.distances import DISTANCES
 from src.preprocess.train_stations import TRAIN_STATIONS
 
-# [NOTE]
+# [NOTE] Load all disruption data but avoid interpreting 'NaN-like' values as such
 dfs = [ pd.read_csv(f, usecols = ['rdt_station_codes', 'cause_en', 'statistical_cause_en', 'start_time', 'end_time'], na_filter = False) for f in glob('./data/raw/disruptions/*.csv') ]
 df = pd.concat(dfs, ignore_index = True)
 
@@ -15,7 +15,7 @@ df = df.rename(columns = { 'rdt_station_codes': 'codes', 'cause_en': 'cause', 's
 # [NOTE] Filter out any values that are NaN
 df = df.dropna(subset = ['codes', 'start', 'end'])
 
-# [NOTE]
+# [NOTE] List of causes which are deemed 'too general' and will be overwritten by a more specific cause if available
 INACCURATE_CAUSES = ['an earlier disruption', 'cause yet unknown', 'multiple disruptions']
 
 # [NOTE] Merge the causes into a single column, avoiding any duplicates
@@ -47,13 +47,13 @@ for _, row in df.iterrows():
 	other = { c: row[c] for c in df.columns if c != 'codes' }
 	visited = set()
 
-	# [NOTE]
+	# [NOTE] Add an edge between two affected stations if they are direct neighbours
 	for u in row['codes']:
 		if (neighbours := set(TRAIN_STATIONS.loc[u, 'neighbours']).intersection(row['codes'])): # type: ignore
 			visited.add(u)
 			rows.extend([ { 'from': u, 'to': v, **other } for v in sorted(neighbours - visited) ])
 
-	# [NOTE]
+	# [NOTE] Add an edge between all stations that are in-between affected stations which are not direct neighbours
 	for u in sorted(set(row['codes']) - visited):
 		target = DISTANCES.loc[u, list(visited) or row['codes']].idxmin()
 		visited.add(u)

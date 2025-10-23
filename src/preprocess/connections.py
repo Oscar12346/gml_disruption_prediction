@@ -1,6 +1,6 @@
 import pandas as pd
 
-# [NOTE]
+# [NOTE] Load all connection data but avoid interpreting 'NaN-like' values as such
 df = pd.read_csv('./data/raw/connections/2025.csv', na_filter = False)
 
 

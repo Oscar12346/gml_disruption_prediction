@@ -4,7 +4,7 @@ from src.preprocess.connections import CONNECTIONS
 from src.preprocess.train_stations import TRAIN_STATIONS
 from src.preprocess.weather_stations import WEATHER_STATIONS
 
-# [NOTE]
+# [NOTE] Base graph initialisation from which each snapshot hereafter is derived
 BASE_GRAPH = nx.Graph()
 
 BASE_GRAPH.add_nodes_from([ (code, row.to_dict() | { 'type': 'TRAIN' }) for code, row in TRAIN_STATIONS.iterrows() ])

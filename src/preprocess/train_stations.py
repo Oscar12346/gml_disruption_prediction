@@ -15,7 +15,7 @@ df = df.drop(columns = ['country'])
 neighbours = pd.concat([ CONNECTIONS, CONNECTIONS.rename(columns = { 'to': 'from', 'from': 'to' }) ]).groupby('from')['to']
 df['neighbours'] = df.index.map(neighbours.apply(lambda x: sorted(set(x))))
 
-# [NOTE]
+# [NOTE] Compute the closest weather station for some train station based on haversine distance
 def find_closest_weather_station(row) -> str:
 	def haversine(lat, lng, lat_, lng_) -> int:
 		lat, lng, lat_, lng_ = map(np.radians, [lat, lng, lat_, lng_])
