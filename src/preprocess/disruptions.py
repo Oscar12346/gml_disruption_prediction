@@ -20,7 +20,7 @@ df = df.drop(columns = ['original_cause'])
 # [TODO] Filter out any unrelated causes
 
 # [NOTE] Convert station codes into list of Dutch station codes and date strings into datetimes
-df['codes'] = df['codes'].str.split(', ').apply(lambda cs: [ c for c in cs if c in TRAIN_STATIONS.index ])
+df['codes'] = df['codes'].str.split(', ').apply(lambda cs: sorted([ c for c in cs if c in TRAIN_STATIONS.index ]))
 df['start'] = pd.to_datetime(df['start'])
 df['end'] = pd.to_datetime(df['end'])
 
@@ -39,10 +39,10 @@ for _, row in df.iterrows():
 	for u in row['codes']:
 		if (neighbours := set(TRAIN_STATIONS.loc[u, 'neighbours']).intersection(row['codes'])): # type: ignore
 			visited.add(u)
-			rows.extend([ { 'from': u, 'to': v, **other } for v in neighbours - visited ])
+			rows.extend([ { 'from': u, 'to': v, **other } for v in sorted(neighbours - visited) ])
 
 	# [NOTE]
-	for u in set(row['codes']) - visited:
+	for u in sorted(set(row['codes']) - visited):
 		target = DISTANCES.loc[u, list(visited) or row['codes']].idxmin()
 		visited.add(u)
 
