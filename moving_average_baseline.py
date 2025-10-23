@@ -76,9 +76,6 @@ def moving_average_baseline_k_steps(graph_dict, window=6, k=1):
     """
     Predict k steps ahead using a moving average of previous 'window' hours.
     """
-    import pandas as pd
-    import numpy as np
-
     times = sorted(graph_dict.keys())
     edges = list(graph_dict[times[0]].edges())
 
@@ -142,6 +139,7 @@ def plot_baseline_results(results, edge=None, avg_over_all=True, savepath=None):
 
 # Run moving avg
 # Better to do this in one main/runnable file but easier for now to test for me
+
 if __name__ == "__main__":
 
     EPOCH = pd.Timestamp('2023-01-01 00:00:00')
@@ -157,8 +155,7 @@ if __name__ == "__main__":
     print("Max snapshot key:", max(graph_dict.keys()))
 
     print("Running recursive moving-average baseline...")
-    # results = moving_average_baseline(graph_dict,
-    #                                    window=WINDOW, horizon=HORIZON)
+    # results = moving_average_baseline_k_steps(graph_dict, window=WINDOW, k=10)
     results = moving_average_baseline(graph_dict, train_split_idx=4000)
     # Save wide format CSVs
     results['y_true'].to_csv(os.path.join(out_dir, "y_true_wide.csv"))
