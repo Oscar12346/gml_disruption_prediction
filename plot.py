@@ -20,7 +20,7 @@ def plot_snapshot(frame: int) -> None:
 
 	G = SNAPSHOTS[frame]
 
-	ax.set_title(f'{G.graph['start']} - {G.graph['end']}')
+	ax.set_title(f"{G.graph['start']} - {G.graph['end']}")
 	edge_colours = [ 'red' if t == 'DISRUPTION' else 'darkseagreen' if t == 'WEATHER' else 'grey' for _, _, t in G.edges.data('type') ]
 
 	nx.draw(G, edge_color = edge_colours, **plot_options)
