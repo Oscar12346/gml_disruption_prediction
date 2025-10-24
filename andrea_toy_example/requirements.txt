@@ -1,0 +1,6 @@
+numpy>=1.22
+pandas>=1.5
+matplotlib>=3.6
+networkx>=3.3
+torch
+torch_geometric
