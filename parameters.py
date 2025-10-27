@@ -3,7 +3,7 @@ import pandas as pd
 
 # [NOTE] Timestamps denoting the time between which data must have been recorded
 EPOCH = pd.Timestamp('2023-01-01 00:00:00')
-HORIZON = pd.Timestamp('2025-01-01 00:00:00')
+HORIZON = pd.Timestamp('2023-02-01 00:00:00')
 
 # [NOTE] Weather station metrics to include as node features
 WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']

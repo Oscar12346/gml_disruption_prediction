@@ -12,47 +12,70 @@ def build_line_graph_adj_matrix(connections: pd.DataFrame, dtype=torch.float32):
     with columns ['C1', 'C2'] or from a networkx Graph.
     Returns (A_s_sparse: torch.sparse_coo_tensor, edge_list: List[Tuple(u,v)])
     """
-    # Build networkx graph
+    # Step 1: Build the base undirected graph from connections
     G = nx.from_pandas_edgelist(connections, 'C1', 'C2', create_using=nx.Graph())
     orig_edges = list(G.edges())
     nE = len(orig_edges)
+
+    # Map original edge -> index in line-graph space
     edge2idx = {e: i for i, e in enumerate(orig_edges)}
     rows, cols = [], []
+
+    # Step 2: Build connectivity between edges that share a node
     for (u, v) in nx.line_graph(G).edges():
         i = edge2idx[u]
         j = edge2idx[v]
+        # Add symmetric connections (since graph is undirected)
         rows.append(i); cols.append(j)
         rows.append(j); cols.append(i)
-    # add self loops
+
+    # Step 3: Add self-loops to stabilize GCN normalization
     for i in range(nE):
         rows.append(i); cols.append(i)
+
+    # Step 4: Convert to sparse COO format
     if len(rows) == 0:
         indices = torch.empty((2,0), dtype=torch.int64)
         values = torch.empty((0,), dtype=dtype)
     else:
         indices = torch.tensor([rows, cols], dtype=torch.int64)
         values = torch.ones(indices.shape[1], dtype=dtype)
+
     A = torch.sparse_coo_tensor(indices, values, (nE, nE))
     return A.coalesce(), orig_edges
 
 def normalize_sparse_adj(A: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
+    """
+    Apply symmetric normalization:  A_hat = D^{-1/2} * A * D^{-1/2}.
+    This ensures numerical stability and equal weighting in message passing.
+    """
     A = A.coalesce()
     indices = A.indices()
     values = A.values()
     n = A.shape[0]
+
+    # Compute node degrees from sparse indices
     deg = torch.zeros(n, dtype=values.dtype)
     for idx, val in zip(indices.t(), values):
         deg[idx[0]] += val
+
+    # Invert sqrt of degree (avoid div by zero)
     deg_inv_sqrt = torch.pow(deg, -0.5)
     deg_inv_sqrt[~torch.isfinite(deg_inv_sqrt)] = 0.0
+
+    # Apply normalization elementwise
     row, col = indices[0, :], indices[1, :]
     vals = values * deg_inv_sqrt[row] * deg_inv_sqrt[col]
     return torch.sparse_coo_tensor(indices, vals, A.shape).coalesce()
 
 def sparse_mm(A: torch.sparse_coo_tensor, X: torch.Tensor) -> torch.Tensor:
+    """Sparse-dense matrix multiplication wrapper for readability."""
     return torch.spmm(A, X)
 
 class EdgeLineGraphBuilder:
+    """
+    Class to construct and hold normalized line-graph adjacency.
+    """
     def __init__(self, connections_df: pd.DataFrame):
         self.connections_df = connections_df
         self.A_s, self.edge_list = build_line_graph_adj_matrix(connections_df)
@@ -64,6 +87,10 @@ class EdgeLineGraphBuilder:
         return self.edge_list
 
 class MLP(nn.Module):
+    """
+    Feedforward network used for embedding edge & weather features.
+    """
+
     def __init__(self, in_dim, out_dim, hidden_dims=(), activation=nn.ReLU, final_activation=None):
         super().__init__()
         dims = [in_dim] + list(hidden_dims) + [out_dim]
@@ -75,10 +102,15 @@ class MLP(nn.Module):
         if final_activation is not None:
             layers.append(final_activation())
         self.model = nn.Sequential(*layers)
+
     def forward(self, x):
         return self.model(x)
 
 class SimpleGraphConv(nn.Module):
+    """
+    Sparse GCN-style graph convolution layer:
+      H' = σ(A_hat * H * W + b)
+    """
     def __init__(self, in_dim, out_dim, activation=nn.ReLU, use_bias=True):
         super().__init__()
         self.W = nn.Parameter(torch.Tensor(in_dim, out_dim))
@@ -88,12 +120,16 @@ class SimpleGraphConv(nn.Module):
             self.register_parameter('bias', None)
         self.activation = activation()
         self.reset_parameters()
+
     def reset_parameters(self):
+        # Initialize weights uniformly for stable early training
         stdv = 1.0 / math.sqrt(self.W.size(1))
         self.W.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.zero_()
+
     def forward(self, A_sparsed: torch.sparse_coo_tensor, H: torch.Tensor):
+        # (N, F_in) * (F_in, F_out)
         HW = H.matmul(self.W)
         out = sparse_mm(A_sparsed, HW)
         if self.bias is not None:
@@ -101,18 +137,27 @@ class SimpleGraphConv(nn.Module):
         return self.activation(out)
 
 class TemporalGatedConv(nn.Module):
+    """
+    Temporal modeling via gated 1D convolution (WaveNet-style):
+      output = tanh(Conv_f(X)) * sigmoid(Conv_g(X))
+    Captures nonlinear temporal interactions over hours.
+    """
     def __init__(self, in_dim, out_dim, kernel_size=3, dilation=1):
         super().__init__()
+        # Use causal padding to preserve sequence length
         padding = (kernel_size-1) * dilation
         self.conv_f = nn.Conv1d(in_dim, out_dim, kernel_size, padding=padding, dilation=dilation)
         self.conv_g = nn.Conv1d(in_dim, out_dim, kernel_size, padding=padding, dilation=dilation)
         self.out_dim = out_dim
+
     def forward(self, X):
+        # Expect shape [N, T, D] -> [N, D, T] for Conv1d
         x = X.transpose(1, 2)
+        # Slice to ensure original temporal length (drop padding artifacts)
         f = self.conv_f(x)[..., :X.shape[1]]
         g = self.conv_g(x)[..., :X.shape[1]]
         out = torch.tanh(f) * torch.sigmoid(g)
-        out = out.transpose(1, 2)
+        out = out.transpose(1, 2) # restore [N, T, D]
         return out
 
 class TemporalTransformerEncoder(nn.Module):
@@ -208,7 +253,7 @@ class E_STFGNN(nn.Module):
         self.fusion = FusionAdjacency(n_nodes=n_edges, learnable_scalar=True)
         self.blocks = nn.ModuleList([SpatioTemporalFusionBlock(n_edges, d_model, d_model, temporal_mode=temporal_mode) for _ in range(n_blocks)])
         self.pred_head = nn.Sequential(nn.Linear(d_model, d_model//2), nn.ReLU(), nn.Linear(d_model//2, 1))
-        
+
     def forward(self, X_edges: torch.Tensor, X_weather_edges: torch.Tensor, A_s: torch.sparse_coo_tensor) -> torch.Tensor:
         N, T, _ = X_edges.shape
         Xe = self.edge_embed(X_edges.view(-1, X_edges.size(-1))).view(N, T, -1)
