@@ -11,6 +11,12 @@ Install required dependencies:
 pip install -r requirements.txt
 ```
 
+Preprocess all raw data:
+
+```shell
+python preprocess.py
+```
+
 Draw graph:
 
 ```shell
