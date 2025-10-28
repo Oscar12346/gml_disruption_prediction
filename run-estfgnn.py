@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import networkx as nx
-import pandas as pd
 import random
 import numpy as np
+from torch.utils.data import DataLoader
 
 # Set seeds for reproducibility
 torch.manual_seed(0)
@@ -15,8 +15,8 @@ random.seed(0)
 # -------------------------
 # User-defined parameters
 # -------------------------
-EPOCH = pd.Timestamp('2023-01-01 00:00:00')
-HORIZON = pd.Timestamp('2023-02-01 00:00:00')
+# EPOCH = pd.Timestamp('2023-01-01 00:00:00')
+# HORIZON = pd.Timestamp('2023-02-01 00:00:00')
 WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
 
 # -------------------------
@@ -86,11 +86,13 @@ class SimpleGraphConv(nn.Module):
         self.bias = nn.Parameter(torch.zeros(out_dim)) if use_bias else None
         self.activation = activation()
         self.reset_parameters()
+
     def reset_parameters(self):
         stdv = 1.0 / math.sqrt(self.W.size(1))
         self.W.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.zero_()
+
     def forward(self, A_sparsed: torch.sparse_coo_tensor, H: torch.Tensor):
         HW = H.matmul(self.W)
         out = sparse_mm(A_sparsed, HW)
@@ -104,6 +106,7 @@ class TemporalGatedConv(nn.Module):
         padding = (kernel_size-1) * dilation
         self.conv_f = nn.Conv1d(in_dim, out_dim, kernel_size, padding=padding, dilation=dilation)
         self.conv_g = nn.Conv1d(in_dim, out_dim, kernel_size, padding=padding, dilation=dilation)
+
     def forward(self, X):
         x = X.transpose(1,2)
         f = self.conv_f(x)[..., :X.shape[1]]
@@ -123,6 +126,7 @@ class MLP(nn.Module):
         if final_activation is not None:
             layers.append(final_activation())
         self.model = nn.Sequential(*layers)
+
     def forward(self, x):
         return self.model(x)
 
@@ -133,6 +137,7 @@ class SpatioTemporalFusionBlock(nn.Module):
         self.temporal = TemporalGatedConv(hidden_dim, hidden_dim, kernel_size=3)
         self.res_proj = nn.Linear(in_dim, hidden_dim) if in_dim != hidden_dim else nn.Identity()
         self.norm = nn.LayerNorm(hidden_dim)
+
     def forward(self, H: torch.Tensor, A_f: torch.sparse_coo_tensor):
         N, T, D = H.shape
         H_out_time = []
@@ -187,9 +192,13 @@ num_edges = len(node2idx)
 rows, cols = [], []
 for (u,v) in LG.edges():
     i, j = node2idx[u], node2idx[v]
-    rows += [i,j]; cols += [j,i]
+    rows += [i,j]
+    cols += [j,i]
+
 for i in range(num_edges):
-    rows.append(i); cols.append(i)
+    rows.append(i)
+    cols.append(i)
+
 indices = torch.tensor([rows, cols], dtype=torch.long)
 values = torch.ones(len(rows), dtype=torch.float32)
 A_s = torch.sparse_coo_tensor(indices, values, (num_edges, num_edges)).coalesce().to(device)
@@ -215,7 +224,6 @@ def split_dataset(X_seq, Xw_seq, Y_seq, train_ratio=0.6, val_ratio=0.2):
     T = X_seq.shape[0]
     n_train = int(T * train_ratio)
     n_val = int(T * val_ratio)
-    n_test = T - n_train - n_val
 
     X_train = X_seq[:n_train]
     Xw_train = Xw_seq[:n_train]
@@ -261,11 +269,11 @@ def slide_window(X_seq, Xw_seq, Y_seq, window_sizes):
 
     return X_e_list, X_w_list, Y_list
 
-window_sizes = [48, 24, 8, 4, 2]
-
-X_train_list, Xw_train_list, Y_train_list = slide_window(X_train, Xw_train, Y_train, window_sizes)
-X_val_list, Xw_val_list, Y_val_list = slide_window(X_val, Xw_val, Y_val, window_sizes)
-X_test_list, Xw_test_list, Y_test_list = slide_window(X_test, Xw_test, Y_test, window_sizes)
+# window_sizes = [48, 24, 8, 4, 2]
+#
+# X_train_list, Xw_train_list, Y_train_list = slide_window(X_train, Xw_train, Y_train, window_sizes)
+# X_val_list, Xw_val_list, Y_val_list = slide_window(X_val, Xw_val, Y_val, window_sizes)
+# X_test_list, Xw_test_list, Y_test_list = slide_window(X_test, Xw_test, Y_test, window_sizes)
 
 # -------------------------
 # Training helpers
@@ -298,26 +306,73 @@ def evaluate(model, X_list, Xw_list, Y_list):
 # -------------------------
 # Instantiate and train model
 # -------------------------
-model = E_STFGNN(
-    n_edges=len(LG.nodes()),
-    in_feat_dim=1,
-    weather_dim=len(WEATHER_FEATURES),
-    d_model=64,
-    n_blocks=2
-).to(device)
+configs = [
+    {"d_model": 32,  "n_blocks": 1, "lr": 1e-3, "window_sizes": [8, 4, 2]},
+    {"d_model": 64,  "n_blocks": 2, "lr": 1e-3, "window_sizes": [24, 8, 4]},
+    {"d_model": 64,  "n_blocks": 3, "lr": 5e-4, "window_sizes": [48, 24, 8]},
+    {"d_model": 128, "n_blocks": 2, "lr": 1e-4, "window_sizes": [48, 24, 12]},
+    {"d_model": 128, "n_blocks": 3, "lr": 5e-4, "window_sizes": [24, 12, 6]},
+]
 
-optim = torch.optim.Adam(model.parameters(), lr=1e-3)
-num_epochs = 20
-best_val_loss = float('inf')
-for epoch in range(num_epochs):
-    train_one_epoch(model, optim, X_train_list, Xw_train_list, Y_train_list)
-    val_loss = evaluate(model, X_val_list, Xw_val_list, Y_val_list)
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        best_state = model.state_dict()
-    print(f"Epoch {epoch+1}/{num_epochs}, Val Loss: {val_loss:.4f}")
+results = []
+best_overall_val_loss = float('inf')
+best_overall_model_state = None
+best_overall_cfg = None
 
-# Load best model
-model.load_state_dict(best_state)
-test_loss = evaluate(model, X_test_list, Xw_test_list, Y_test_list)
-print(f"Test MSE Loss: {test_loss:.4f}")
+for i, cfg in enumerate(configs, 1):
+    print(f"\n=== Running config {i}: {cfg} ===")
+
+    # Recreate model and optimizer for each run
+    model = E_STFGNN(
+        n_edges=len(LG.nodes()),
+        in_feat_dim=1,
+        weather_dim=len(WEATHER_FEATURES),
+        d_model=cfg["d_model"],
+        n_blocks=cfg["n_blocks"]
+    ).to(device)
+
+    optim = torch.optim.Adam(model.parameters(), lr=cfg["lr"])
+
+    # Rebuild sliding windows using the config's window sizes
+    X_train_list, Xw_train_list, Y_train_list = slide_window(X_train, Xw_train, Y_train, cfg["window_sizes"])
+    X_val_list, Xw_val_list, Y_val_list = slide_window(X_val, Xw_val, Y_val, cfg["window_sizes"])
+    X_test_list, Xw_test_list, Y_test_list = slide_window(X_test, Xw_test, Y_test, cfg["window_sizes"])
+
+    best_val_loss = float('inf')
+    num_epochs = 20
+
+    for epoch in range(num_epochs):
+        train_one_epoch(model, optim, X_train_list, Xw_train_list, Y_train_list)
+        val_loss = evaluate(model, X_val_list, Xw_val_list, Y_val_list)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_state = model.state_dict()
+        print(f"Epoch {epoch+1}/{num_epochs}, Val Loss: {val_loss:.4f}")
+
+    model.load_state_dict(best_state)
+    test_loss = evaluate(model, X_test_list, Xw_test_list, Y_test_list)
+
+    results.append({
+        "config": cfg,
+        "val_loss": best_val_loss,
+        "test_loss": test_loss
+    })
+
+    print(f"Config {i}, -> Val: {best_val_loss:.4f}, Test: {test_loss:.4f}")
+
+    # Update overall best model
+    if best_val_loss < best_overall_val_loss:
+        best_overall_val_loss = best_val_loss
+        best_overall_model_state = best_state
+        best_overall_cfg = cfg
+
+torch.save({
+    "model_state_dict": best_overall_model_state,
+    "config": best_overall_cfg,
+}, "best_estfgnn_model.pt")
+
+print("\n=== Summary of All Configs ===")
+for res in results:
+    cfg = res["config"]
+    print(f"d_model={cfg['d_model']}, n_blocks={cfg['n_blocks']}, lr={cfg['lr']}, windows={cfg['window_sizes']}"
+          f"-> Val: {res['val_loss']:.4f}, Test: {res['test_loss']:.4f}")
