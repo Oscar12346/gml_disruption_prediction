@@ -4,18 +4,22 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from graph import SNAPSHOTS
+from src.graph import SNAPSHOTS
 
 
 def snapshots_to_df(graph_dict):
+    # Takes long time
     times = sorted(graph_dict.keys())
-    edges = sorted(list(graph_dict[times[0]].edges()))
+    edges = list(graph_dict[times[0]].edges())
+
+    edges = sorted(edges, key=lambda x: (str(x[0]), str(x[1])))
     data = [
-        [graph_dict[t][u][v].get('weight', 0.0) for (u, v) in edges]
+        [graph_dict[t][u][v].get('duration', 0.0) for (u, v) in edges]
         for t in times
     ]
-    df = pd.DataFrame(data, index=times, columns=edges)
+    df = pd.DataFrame(data, index=times, columns=edges)  # plain tuples
     return df, edges, times
+
 
 def weighted_rolling_mean(series, weights):
     """Apply weighted moving average to a 1D pandas series."""
@@ -50,6 +54,7 @@ def plot_avg(y_true, y_pred, title, outpath=None):
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
+    print(outpath)
     if outpath:
         plt.savefig(outpath, dpi=150)
     plt.close()
@@ -63,50 +68,66 @@ if __name__ == "__main__":
     }
 
     df_all, edges, times = snapshots_to_df(SNAPSHOTS)
+
+    n_last = 24 * 30
+
+    # pick the last n_last rows
+    df_last_month = df_all.iloc[-n_last:]
+
+    print(f"Using last {n_last} timesteps for evaluation.")
+    print(f"Time range: {df_last_month.index[0]} -> {df_last_month.index[-1]}")
+
     summary = []
-    out_dir = "outputs/moving_average_baseline"
+    out_dir = os.path.join(os.getcwd(), "outputs", "moving_average_baseline")  # absolute path
+    os.makedirs(out_dir, exist_ok=True)
     weighted = False #Change to true for weighted average
 
     for name, window in windows.items():
         print(f"Computing moving average with window {name} ({window} hours)...")
-        y_true, y_pred, mae, rmse = one_step_moving_average(df_all, window, weighted=weighted)
+        # Predictions use full history, but metrics/plots only for last month
+        y_true_full, y_pred_full, mae_full, rmse_full = one_step_moving_average(df_all, window)
+        y_true_month = y_true_full.iloc[-n_last:]
+        y_pred_month = y_pred_full.iloc[-n_last:]
 
-        prefix = os.path.join(out_dir, f"{name}")
+        # Save wide CSVs
+        prefix = os.path.join(out_dir, name)
         os.makedirs(prefix, exist_ok=True)
-        y_true.to_csv(os.path.join(prefix, "y_true_wide.csv"))
-        y_pred.to_csv(os.path.join(prefix, "y_pred_wide.csv"))
+        y_true_month.to_csv(os.path.join(prefix, "y_true_last_month.csv"))
+        y_pred_month.to_csv(os.path.join(prefix, "y_pred_last_month.csv"))
 
-        # flattened version
+        # Flattened CSV
         edges_str = [f"{u}-{v}" for (u, v) in edges]
         flat = pd.DataFrame({
-            'time': np.repeat(y_true.index, len(edges)),
-            'edge': np.tile(edges_str, len(y_true)),
-            'y_true': y_true.to_numpy().ravel(),
-            'y_pred': y_pred.to_numpy().ravel()
+            'time': np.repeat(y_true_month.index, len(edges)),
+            'edge': np.tile(edges_str, len(y_true_month)),
+            'y_true': y_true_month.to_numpy().ravel(),
+            'y_pred': y_pred_month.to_numpy().ravel()
         })
-        flat.to_csv(os.path.join(prefix, "predictions_flat.csv"), index=False)
+        flat.to_csv(os.path.join(prefix, "predictions_flat_last_month.csv"), index=False)
 
-        # plot average over all edges
-        plot_avg(y_true, y_pred, title=f"MA one-step ({name})", outpath=os.path.join(prefix, "avg_plot.png"))
+        # Plot average over edges
+        plot_avg(y_true_month, y_pred_month,
+                 title=f"MA one-step ({name}) last 30 days",
+                 outpath=os.path.join(prefix, "avg_plot_last_month.png"))
 
-        print(f"{name}  MAE={mae:.4f}, RMSE={rmse:.4f}")
-        summary.append({'window_name': name, 'window_hours': window, 'MAE': float(mae), 'RMSE': float(rmse)})
+        print(f"{name}: MAE={mae_full:.4f}, RMSE={rmse_full:.4f}")
+        summary.append({'window_name': name, 'window_hours': window, 'MAE': float(mae_full), 'RMSE': float(rmse_full)})
 
 
+        # Summary table
     summary_df = pd.DataFrame(summary)
-    summary_df.to_csv(os.path.join(out_dir, "summary_metrics.csv"), index=False)
-
-    # plot all different windows
+    summary_df.to_csv(os.path.join(out_dir, "summary_metrics_last_month.csv"), index=False)
+    # summary plot across windows (MAE and RMSE)
     plt.figure(figsize=(6, 4))
     plt.bar(summary_df['window_name'], summary_df['MAE'], color='C0', alpha=0.7, label='MAE')
     plt.bar(summary_df['window_name'], summary_df['RMSE'], color='C1', alpha=0.4, label='RMSE')
     plt.xlabel("Moving Average Window")
     plt.ylabel("Error (minutes)")
-    plt.title("Baseline Moving Average Performance by Window Size")
+    plt.title(f"MAE/RMSE by window for last month")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "mae_rmse_by_window.png"), dpi=150)
+    plt.savefig(os.path.join(out_dir, "mae_rmse_by_window_month.png"), dpi=150)
     plt.show()
-    print("\nSummary of all windows:")
+    print("\nSummary of all windows for last month:")
     print(summary_df)
 
