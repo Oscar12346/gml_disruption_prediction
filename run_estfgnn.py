@@ -136,16 +136,28 @@ class E_STFGNN(nn.Module):
     def __init__(self, n_edges, in_feat_dim, weather_dim, d_model=64, n_blocks=2):
         super().__init__()
         self.edge_embed = MLP(in_feat_dim, d_model, hidden_dims=(d_model//2,))
-        self.weather_embed = MLP(weather_dim, d_model, hidden_dims=(d_model//2,))
-        self.combine = nn.Linear(d_model*2, d_model)
+        # If no weather features are provided, skip creating a weather embed and
+        # adjust the combine projection accordingly.
+        self.use_weather = (weather_dim is not None and weather_dim > 0)
+        if self.use_weather:
+            self.weather_embed = MLP(weather_dim, d_model, hidden_dims=(d_model//2,))
+            self.combine = nn.Linear(d_model*2, d_model)
+        else:
+            self.weather_embed = None
+            # project edge embedding to model dim (or identity-like projection)
+            self.combine = nn.Linear(d_model, d_model)
         self.blocks = nn.ModuleList([SpatioTemporalFusionBlock(n_edges, d_model, d_model) for _ in range(n_blocks)])
         self.pred_head = nn.Sequential(nn.Linear(d_model, d_model//2), nn.ReLU(), nn.Linear(d_model//2, 1))
 
     def forward(self, X_edges, X_weather_edges, A_s: torch.sparse_coo_tensor):
         N, T, _ = X_edges.shape
         Xe = self.edge_embed(X_edges.contiguous().view(-1, X_edges.size(-1))).reshape(N, T, -1)
-        Xw = self.weather_embed(X_weather_edges.contiguous().view(-1, X_weather_edges.size(-1))).reshape(N, T, -1)
-        H0 = torch.relu(self.combine(torch.cat([Xe, Xw], dim=-1)))
+        if self.use_weather:
+            Xw = self.weather_embed(X_weather_edges.contiguous().view(-1, X_weather_edges.size(-1))).reshape(N, T, -1)
+            H0 = torch.relu(self.combine(torch.cat([Xe, Xw], dim=-1)))
+        else:
+            # No weather features: use only edge embedding
+            H0 = torch.relu(self.combine(Xe))
         H = H0
         for block in self.blocks:
             H = block(H, A_s)
