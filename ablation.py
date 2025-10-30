@@ -6,18 +6,20 @@ parser.add_argument('--weather_features', type=str, choices=['all', 'none', 'con
                     help="Specify which weather features to include: 'all', 'none', or 'continuous'")
 args = parser.parse_args()
 
+import parameters
+
+if args.weather_features == "all":
+    parameters.WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
+elif args.weather_features == "none":
+    parameters.WEATHER_FEATURES = []
+elif args.weather_features == "continuous":
+    parameters.WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration']
+
 import random
 import numpy as np
 import torch
 from run_estfgnn import E_STFGNN, build_minimal_graph, evaluate, make_linegraph, build_edge_and_weather_tensors, slide_window, split_dataset, train_one_epoch
 import run_estfgnn
-
-if args.weather_features == "all":
-    run_estfgnn.WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
-elif args.weather_features == "none":
-    run_estfgnn.WEATHER_FEATURES = []
-elif args.weather_features == "continuous":
-    run_estfgnn.WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration']
 
 # Use GPU if available
 if torch.cuda.is_available():
@@ -85,7 +87,7 @@ config = {"d_model": 128, "n_blocks": 2, "lr": 1e-4, "window_sizes": [48, 24, 12
 model = E_STFGNN(
     n_edges=len(LG.nodes()),
     in_feat_dim=1,
-    weather_dim=len(run_estfgnn.WEATHER_FEATURES),
+    weather_dim=len(parameters.WEATHER_FEATURES),
     d_model=config["d_model"],
     n_blocks=config["n_blocks"]
 ).to(run_estfgnn.device)
@@ -94,8 +96,8 @@ print("\nModel Configuration:")
 for key, value in config.items():
     print(f"  {key}: {value}")
 print("\nIncluded Weather Features:")
-if run_estfgnn.WEATHER_FEATURES:
-    for feature in run_estfgnn.WEATHER_FEATURES:
+if parameters.WEATHER_FEATURES:
+    for feature in parameters.WEATHER_FEATURES:
         print(f"  - {feature}")
 else:
     print("  (no weather features selected)")

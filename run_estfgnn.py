@@ -239,7 +239,10 @@ def evaluate(model, X_list, Xw_list, Y_list):
         loss = F.mse_loss(y_pred, Y_true.unsqueeze(-1))
         eval_loss += loss.item()
     return eval_loss / len(X_list)
-    
+
+import parameters
+WEATHER_FEATURES = parameters.WEATHER_FEATURES
+
 if __name__ == "__main__":
     # Set seeds for reproducibility
     torch.manual_seed(0)
@@ -251,7 +254,6 @@ if __name__ == "__main__":
     # -------------------------
     # EPOCH = pd.Timestamp('2023-01-01 00:00:00')
     # HORIZON = pd.Timestamp('2023-02-01 00:00:00')
-    WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration', 'fog', 'snow', 'thunder', 'ice']
 
     # -------------------------
     # Placeholder for SNAPSHOTS
