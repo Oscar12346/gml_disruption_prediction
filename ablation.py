@@ -2,8 +2,8 @@ import argparse
 
 # First, parse command-line arguments
 parser = argparse.ArgumentParser(description="E-STFGNN Training")
-parser.add_argument('--weather_features', type=str, choices=['all', 'none', 'continuous'], required=True,
-                    help="Specify which weather features to include: 'all', 'none', or 'continuous'")
+parser.add_argument('--weather_features', type=str, choices=['all', 'none', 'continuous', 'boolean'], required=True,
+                    help="Specify which weather features to include: 'all', 'none', 'continuous', or 'boolean'")
 args = parser.parse_args()
 
 import parameters
@@ -14,6 +14,8 @@ elif args.weather_features == "none":
     parameters.WEATHER_FEATURES = []
 elif args.weather_features == "continuous":
     parameters.WEATHER_FEATURES = ['wind', 'wind_max', 'temperature', 'rain', 'rain_duration']
+elif args.weather_features == "boolean":
+    parameters.WEATHER_FEATURES = ['fog', 'snow', 'thunder', 'ice']
 
 import random
 import numpy as np
