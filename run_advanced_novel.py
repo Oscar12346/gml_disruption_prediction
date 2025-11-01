@@ -1,4 +1,17 @@
+"""
+Driver script for training, evaluation, and interpretability of the E-STFGNN model.
+
+This script:
+  - Builds graph snapshots and corresponding line-graph datasets
+  - Trains and validates the E-STFGNN model with hyperparameter configurations
+  - Saves the best-performing model checkpoint
+  - Performs interpretability analyses (saliency, integrated gradients, permutation importance)
+  - Visualizes weather feature importance as a bar plot
+"""
+
 import random
+import numpy as np
+import torch
 
 from src.graph import SNAPSHOTS
 from src.models.advanced_novel_model.helpers import *
@@ -6,12 +19,20 @@ from src.models.advanced_novel_model.estfgnn import *
 from src.models.advanced_novel_model.interpretability import *
 
 
+# -------------------------------------------------------------------
+# Setup and environment
+# -------------------------------------------------------------------
+
 torch.manual_seed(0)
 np.random.seed(0)
 random.seed(0)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Using device:", device)
+
+# -------------------------------------------------------------------
+# Build minimal graph and line graph representation
+# -------------------------------------------------------------------
 
 first_snapshot = list(SNAPSHOTS.values())[0]
 G_min = build_minimal_graph(first_snapshot)
@@ -21,19 +42,24 @@ idx2node = {i: n for n, i in node2idx.items()}
 num_edges = len(node2idx)
 print(f"Number of edges (line-graph nodes): {num_edges}")
 
+# Construct static adjacency (A_s)
 rows, cols = [], []
 for (u, v) in LG.edges():
     i, j = node2idx[u], node2idx[v]
     rows += [i, j]
     cols += [j, i]
-
+# Add self-loops
 for i in range(num_edges):
     rows.append(i); cols.append(i)
+
 indices = torch.tensor([rows, cols], dtype=torch.long)
 values = torch.ones(len(rows), dtype=torch.float32)
 A_s = torch.sparse_coo_tensor(indices, values, (num_edges, num_edges)).coalesce().to(device)
 
-# Build full-time sequences
+# -------------------------------------------------------------------
+# Build time sequences across all snapshots
+# -------------------------------------------------------------------
+
 X_edges_seq = []
 X_weather_edges_seq = []
 Y_seq = []
@@ -52,7 +78,15 @@ X_weather_edges_seq = torch.stack(X_weather_edges_seq)
 Y_seq = torch.stack(Y_seq)
 print("Sequence shapes (T, N, F):", X_edges_seq.shape, X_weather_edges_seq.shape, Y_seq.shape)
 
+# -------------------------------------------------------------------
+# Dataset splitting
+# -------------------------------------------------------------------
+
 X_train, Xw_train, Y_train, X_val, Xw_val, Y_val, X_test, Xw_test, Y_test = split_dataset(X_edges_seq, X_weather_edges_seq, Y_seq)
+
+# -------------------------------------------------------------------
+# Model configurations and training loop
+# -------------------------------------------------------------------
 
 configs = [
     # Best tuned configuration
@@ -119,12 +153,13 @@ if best_overall_model_state is not None:
     print(f"Saved best overall model -> best_estfgnn_model_interpretability.pt (Val Loss {best_overall_val_loss:.6f})")
 
 # -------------------------------------------------------------------
-# Interpretability usage (after training) - one validation window
+# Interpretability analyses
 # -------------------------------------------------------------------
 
 checkpoint = torch.load("output/best_estfgnn_model_interpretability.pt", map_location=device)
 best_cfg = checkpoint["config"]
 print("Loaded checkpoint config:", best_cfg)
+
 model = E_STFGNN(n_edges=num_edges,
                  in_feat_dim=1,
                  weather_dim=len(WEATHER_FEATURES),
@@ -136,10 +171,10 @@ model.eval()
 
 # Choose a validation window to inspect
 if len(X_val_list) > 0:
-    example_Xe = X_val_list[0]    # [N, W, Fe]
-    example_Xw = Xw_val_list[0]   # [N, W, Fw]
+    example_Xe = X_val_list[0]    
+    example_Xw = Xw_val_list[0]
 
-    # 1) Gradient saliency for a specific edge
+    # 1) Gradient saliency
     edge_idx = 10 if num_edges > 10 else 0
     sal_e, sal_w = gradient_saliency(model, example_Xe, example_Xw, A_s, target_edge=edge_idx)
     print(f"Saliency (weather) shape: {sal_w.shape}; per-feature sum:", sal_w[edge_idx].sum(axis=0))
@@ -148,14 +183,17 @@ if len(X_val_list) > 0:
     ig_e, ig_w = integrated_gradients(model, example_Xe, example_Xw, A_s, steps=40, target_edge=edge_idx)
     print("IG per-weather-feature (sum across time) for chosen edge:", ig_w[edge_idx].sum(axis=0))
 
-    # 3) Permutation importance on a subset of validation windows (first 40 windows)
+    # 3) Permutation importance on a subset of validation windows
     subset = min(40, len(X_val_list))
     perm_df = permutation_importance(model, X_val_list[:subset], Xw_val_list[:subset], Y_val_list[:subset], A_s, n_repeats=4)
     print("Permutation importance (top features):")
     print(perm_df.head())
 
+    # **Plot feature importance**
+    plot_feature_importance(perm_df, top_n=10)
+
     # 4) Save top-k edges by IG
-    ig_edge_scores = (np.abs(ig_e).sum(axis=(1,2)))  # sum across time & features -> [N]
+    ig_edge_scores = (np.abs(ig_e).sum(axis=(1,2)))
     topk = topk_edges_from_importance(ig_edge_scores, k=20)
     save_topk_edges_csv(topk, idx2node, "output/topk_ig_edges.csv")
 else:

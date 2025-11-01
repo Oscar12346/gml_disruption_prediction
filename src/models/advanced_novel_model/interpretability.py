@@ -13,8 +13,21 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def _prep_inputs_for_attrib(X_e: torch.Tensor, X_w: torch.Tensor):
     """
-    Helper: clone inputs, move to device and set requires_grad for attribution.
-    Inputs are expected as [N, W, F]
+    Prepare input tensors for gradient-based attribution.
+
+    Clones and moves inputs to the correct device, enabling gradient tracking.
+
+    Parameters
+    ----------
+    X_e : torch.Tensor
+        Edge feature tensor [N, W, F].
+    X_w : torch.Tensor
+        Weather feature tensor [N, W, F].
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        Cloned and gradient-enabled tensors (Xe, Xw).
     """
     Xe = X_e.clone().detach().to(device).float().requires_grad_(True)
     Xw = X_w.clone().detach().to(device).float().requires_grad_(True)
@@ -23,9 +36,26 @@ def _prep_inputs_for_attrib(X_e: torch.Tensor, X_w: torch.Tensor):
 def gradient_saliency(model: nn.Module, X_e: torch.Tensor, X_w: torch.Tensor, A_s: torch.sparse_coo_tensor,
                       target_edge: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Compute gradient * input saliency for a single window (X_e, X_w).
-    Returns numpy arrays (sal_e, sal_w) with same shapes as X_e/X_w.
-    If target_edge is None, the sum over outputs is used to produce gradients (global).
+    Compute gradient × input saliency maps for a single time window.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Trained E-STFGNN model.
+    X_e : torch.Tensor
+        Edge feature input [N, W, F].
+    X_w : torch.Tensor
+        Weather feature input [N, W, F].
+    A_s : torch.sparse_coo_tensor
+        Static adjacency matrix.
+    target_edge : int, optional
+        Index of a specific edge to compute gradients for.
+        If None, gradients are computed globally over all outputs.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        Gradient × input saliency for edge and weather features, matching input shapes.
     """
     model.eval()
     Xe, Xw = _prep_inputs_for_attrib(X_e, X_w)
@@ -44,8 +74,30 @@ def integrated_gradients(model: nn.Module, X_e: torch.Tensor, X_w: torch.Tensor,
                          baseline_e: Optional[torch.Tensor] = None, baseline_w: Optional[torch.Tensor] = None,
                          steps: int = 50, target_edge: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Integrated gradients approximation (Riemann sum) for single window.
-    steps: number of interpolation points
+    Compute Integrated Gradients (IG) for a single time window.
+
+    Uses linear interpolation between a baseline and the actual input,
+    accumulating gradients along the path to estimate feature attributions.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Trained E-STFGNN model.
+    X_e, X_w : torch.Tensor
+        Edge and weather feature inputs [N, W, F].
+    A_s : torch.sparse_coo_tensor
+        Static adjacency matrix.
+    baseline_e, baseline_w : torch.Tensor, optional
+        Baseline inputs for IG (default: zero tensors).
+    steps : int, optional
+        Number of interpolation steps (default: 50).
+    target_edge : int, optional
+        Edge index to compute IG for (default: global).
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        Integrated gradient attributions for edge and weather inputs.
     """
     model.eval()
     if baseline_e is None:
@@ -60,6 +112,7 @@ def integrated_gradients(model: nn.Module, X_e: torch.Tensor, X_w: torch.Tensor,
 
     total_grad_e = torch.zeros_like(Xe, device=device)
     total_grad_w = torch.zeros_like(Xw, device=device)
+
     for alpha in np.linspace(0.0, 1.0, steps, endpoint=True):
         Xstep_e = (baseline_e + alpha * (Xe - baseline_e)).requires_grad_(True)
         Xstep_w = (baseline_w + alpha * (Xw - baseline_w)).requires_grad_(True)
@@ -72,6 +125,7 @@ def integrated_gradients(model: nn.Module, X_e: torch.Tensor, X_w: torch.Tensor,
         score.backward()
         total_grad_e += Xstep_e.grad.detach()
         total_grad_w += Xstep_w.grad.detach()
+
     avg_grad_e = total_grad_e / steps
     avg_grad_w = total_grad_w / steps
     ig_e = ((Xe - baseline_e) * avg_grad_e).detach().cpu().numpy()
@@ -86,23 +140,45 @@ def permutation_importance(model: nn.Module,
                            metric_fn = lambda y_true, y_pred: float(((y_true - y_pred)**2).mean()),  # MSE
                            n_repeats: int = 10) -> pd.DataFrame:
     """
-    Compute permutation importance for weather features using provided windows.
-    Each entry in X_windows is one window: [N,W,F]
-    Returns a DataFrame with delta metric
+    Compute permutation-based feature importance for weather inputs.
+
+    Each weather feature is randomly permuted multiple times, and the
+    degradation in model performance (Δ metric) quantifies its importance.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Trained E-STFGNN model.
+    X_windows, Xw_windows, Y_windows : list of torch.Tensor
+        Lists of edge inputs, weather inputs, and targets.
+    A_s : torch.sparse_coo_tensor
+        Static adjacency matrix.
+    metric_fn : callable, optional
+        Evaluation metric (default: MSE).
+    n_repeats : int, optional
+        Number of random permutations (default: 10).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with base metric, permuted metric, and delta per feature.
     """
     model.eval()
     preds = []
     trues = []
+
     for Xe, Xw, Y in zip(X_windows, Xw_windows, Y_windows):
         y_pred = model(Xe.to(device).float(), Xw.to(device).float(), A_s).detach().cpu()
         preds.append(y_pred.squeeze(-1))
         trues.append(Y.cpu())
+
     base_pred = torch.cat(preds, dim=0).numpy()
     base_true = torch.cat(trues, dim=0).numpy()
     base_metric = metric_fn(base_true, base_pred)
 
     results = []
     Fw = Xw_windows[0].shape[-1]
+
     for feat_idx in range(Fw):
         metrics = []
         for _ in range(n_repeats):
@@ -117,6 +193,7 @@ def permutation_importance(model: nn.Module,
                 shuffled_preds.append(y_pred.squeeze(-1))
             shuffled_pred = torch.cat(shuffled_preds, dim=0).numpy()
             metrics.append(metric_fn(base_true, shuffled_pred))
+
         results.append({
             "feature": WEATHER_FEATURES[feat_idx],
             "base_metric": base_metric,
@@ -124,12 +201,25 @@ def permutation_importance(model: nn.Module,
             "perm_std_metric": float(np.std(metrics)),
             "delta": float(np.mean(metrics) - base_metric)
         })
+
     df = pd.DataFrame(results).sort_values("delta", ascending=False)
     return df
 
 def topk_edges_from_importance(importance_matrix: np.ndarray, k: int = 20) -> List[Tuple[int, float]]:
     """
-    Aggregate importance for edges (abs sum across time & features) and return top-k (edge_idx, score)
+    Aggregate edge-level importance scores and return the top-k edges.
+
+    Parameters
+    ----------
+    importance_matrix : np.ndarray
+        Importance scores, typically [N, W, F] from saliency or IG.
+    k : int, optional
+        Number of top edges to return (default: 20).
+
+    Returns
+    -------
+    list of (int, float)
+        Edge indices and corresponding aggregate scores.
     """
     if importance_matrix.ndim == 1:
         scores = importance_matrix
@@ -139,6 +229,18 @@ def topk_edges_from_importance(importance_matrix: np.ndarray, k: int = 20) -> Li
     return [(int(i), float(scores[i])) for i in idx_sorted[:k]]
 
 def save_topk_edges_csv(topk: List[Tuple[int, float]], idx2node: Dict[int, Tuple], filename: str):
+    """
+    Save top-k edge importance results to a CSV file.
+
+    Parameters
+    ----------
+    topk : list of (int, float)
+        List of top edge indices and scores.
+    idx2node : dict
+        Mapping from edge index to original node pair.
+    filename : str
+        Output CSV path.
+    """
     rows = []
     for i, score in topk:
         edge = idx2node[i]
@@ -147,6 +249,16 @@ def save_topk_edges_csv(topk: List[Tuple[int, float]], idx2node: Dict[int, Tuple
     print(f"Saved top-k edges to {filename}")
 
 def plot_feature_importance(df_perm: pd.DataFrame, top_n: int = 10):
+    """
+    Plot feature importance scores from permutation analysis.
+
+    Parameters
+    ----------
+    df_perm : pd.DataFrame
+        DataFrame returned by `permutation_importance`.
+    top_n : int, optional
+        Number of top features to display (default: 10).
+    """
     df_plot = df_perm.head(top_n).sort_values("delta")
     plt.figure(figsize=(8, max(4, 0.5*top_n)))
     plt.barh(df_plot["feature"], df_plot["delta"])
