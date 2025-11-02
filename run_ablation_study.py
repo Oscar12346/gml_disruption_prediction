@@ -1,3 +1,14 @@
+"""
+E-STFGNN Ablation Study: Weather Feature Inclusion
+
+This script conducts an ablation study on the E-STFGNN model by varying the
+inclusion of different weather feature sets. These configurations include:
+  - All weather features
+  - No weather features
+  - Continuous weather features (wind, temperature, rain)
+  - Boolean weather features (fog, snow, thunder, ice)
+"""
+
 import argparse
 
 # -------------------------------------------------------------------
