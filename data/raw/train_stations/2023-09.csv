@@ -527,8 +527,8 @@ id,code,uic,name_short,name_medium,name_long,slug,country,type,geo_lat,geo_lng
 485,VIERS,8015122,Viersen,Viersen,Viersen,viersen,D,stoptreinstation,51.25516,6.40388
 191,FVS,8846201,Visé,Visé,Visé,vise,B,knooppuntStoptreinstation,50.73781,5.69232
 497,VTN,8400651,Vleuten,Vleuten,Vleuten,vleuten,NL,stoptreinstation,52.103056,5.007404
-493,VS,8400652,Vlissingen,Vlissingen,Vlissingen,vlissingen,NL,knooppuntIntercitystation,51.464721679688,3.5952777862549
-494,VSS,8400653,Souburg,Souburg,"Vlissingen Souburg",vlissingen-souburg,NL,stoptreinstation,51.445835113525,3.5952777862549
+493,VS,8400652,Vlissingen,Vlissingen,Vlissingen,vlissingen,NL,knooppuntIntercitystation,51.445835113525,3.5952777862549
+494,VSS,8400653,Souburg,Souburg,"Vlissingen Souburg",vlissingen-souburg,NL,stoptreinstation,51.464721679688,3.5952777862549
 478,VDL,8400656,Voerendaal,Voerendaal,Voerendaal,voerendaal,NL,stoptreinstation,50.887222290039,5.9302778244019
 475,VB,8400658,Voorburg,Voorburg,Voorburg,voorburg,NL,stoptreinstation,52.066665649414,4.3594446182251
 483,VH,8400655,Voorhout,Voorhout,Voorhout,voorhout,NL,stoptreinstation,52.224445343018,4.4844446182251

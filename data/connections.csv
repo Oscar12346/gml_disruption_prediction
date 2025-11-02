@@ -1,6 +1,6 @@
 from,to
-VSS,VS
-VS,MDB
+VS,VSS
+VSS,MDB
 MDB,ARN
 ARN,GS
 GS,BZL
