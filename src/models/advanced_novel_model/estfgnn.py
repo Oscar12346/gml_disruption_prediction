@@ -49,8 +49,13 @@ class E_STFGNN(nn.Module):
 
         # Embedding layers for edge and weather features
         self.edge_embed = MLP(in_feat_dim, d_model, hidden_dims=(max(8, d_model // 2),))
-        self.weather_embed = MLP(weather_dim, d_model, hidden_dims=(max(8, d_model // 2),))
-        self.combine = nn.Linear(d_model*2, d_model)
+        self.use_weather = weather_dim > 0
+        if self.use_weather:
+            self.weather_embed = MLP(weather_dim, d_model, hidden_dims=(max(8, d_model // 2),))
+            self.combine = nn.Linear(d_model*2, d_model)
+        else:
+            self.weather_embed = None
+            self.combine = nn.Linear(d_model, d_model)
 
         # Temporal adjacency learner and fusion layer
         self.temporal_learner = TemporalAdjLearner(in_dim=d_model, key_dim=key_dim, topk=topk, sparsify=True)
@@ -83,8 +88,11 @@ class E_STFGNN(nn.Module):
 
         # Embed edge and weather sequences across all time steps
         Xe = self.edge_embed(X_edges.contiguous().reshape(-1, X_edges.size(-1))).reshape(N, T, -1)
-        Xw = self.weather_embed(X_weather_edges.contiguous().reshape(-1, X_weather_edges.size(-1))).reshape(N, T, -1)
-        H0 = torch.relu(self.combine(torch.cat([Xe, Xw], dim=-1)))
+        if self.use_weather:
+            Xw = self.weather_embed(X_weather_edges.contiguous().reshape(-1, X_weather_edges.size(-1))).reshape(N, T, -1)
+            H0 = torch.relu(self.combine(torch.cat([Xe, Xw], dim=-1)))
+        else:
+            H0 = torch.relu(self.combine(Xe))
 
         # Compute learned temporal adjacency and fuse with static structure
         A_t = self.temporal_learner(H0)
