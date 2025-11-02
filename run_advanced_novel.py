@@ -171,7 +171,7 @@ model.eval()
 
 # Choose a validation window to inspect
 if len(X_val_list) > 0:
-    example_Xe = X_val_list[0]    
+    example_Xe = X_val_list[0]
     example_Xw = Xw_val_list[0]
 
     # 1) Gradient saliency

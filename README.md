@@ -22,3 +22,9 @@ Draw graph:
 ```shell
 python plot.py
 ```
+
+Run E-STFGNN model:
+
+```shell
+python run_advanced_novel.py
+```
